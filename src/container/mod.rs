@@ -74,7 +74,7 @@ impl Container {
         self.container_pid = match nix::sched::clone(
             box || container_entry_handle(ic.clone()),
             self.stack_memory.as_mut(),
-            CloneFlags::CLONE_NEWUTS | CloneFlags::CLONE_NEWIPC,
+            CloneFlags::CLONE_NEWUTS | CloneFlags::CLONE_NEWIPC | CloneFlags::CLONE_NEWPID,
             Some(nix::sys::signal::SIGCHLD.into()),
         ) {
             Ok(x) => x,
