@@ -38,14 +38,14 @@ struct InternalData {
 }
 
 #[allow(unused_must_use)]
-fn container_entry_handle(cfg: InternalData) -> isize {
+fn container_entry_handle(cfg: InternalData) -> ! {
     let config = &cfg.config;
     nix::unistd::sethostname(config.hostname.clone());
 
     let cstyle_target = CString::new(config.target_process.to_string()).unwrap();
     nix::unistd::execv(&cstyle_target, &[cstyle_target.as_c_str()]);
 
-    0
+    unreachable!()
 }
 
 impl Container {
