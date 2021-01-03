@@ -70,10 +70,11 @@ impl Container {
             config: box self.config.clone(),
         };
 
+        use nix::sched::CloneFlags;
         self.container_pid = match nix::sched::clone(
             box || container_entry_handle(ic.clone()),
             self.stack_memory.as_mut(),
-            nix::sched::CloneFlags::CLONE_NEWUTS,
+            CloneFlags::CLONE_NEWUTS | CloneFlags::CLONE_NEWIPC,
             Some(nix::sys::signal::SIGCHLD.into()),
         ) {
             Ok(x) => x,
