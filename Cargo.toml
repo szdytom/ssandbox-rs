@@ -8,11 +8,5 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-procinfo = "0.4.2"
-seccomp = "0.1.2"
-caps = "0.5.0"
-nix = { git = "https://github.com/szdytom/nix" }
-shared_memory = "0.11.4"
+nix = "0.19.1"
 rand = "0.8.0"
-cgroups-rs = "0.2.0"
-libc = "0.2.81"

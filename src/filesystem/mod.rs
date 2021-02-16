@@ -15,8 +15,7 @@ pub struct MountTmpFs;
 
 impl MountNamespacedFs for MountTmpFs {
     fn loaded(&self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Mounting Temp FS");
-        mount::mount::<str, str, str, str>(
+        mount::mount::<_, _, _, str>(
             Some("tmpfs"),
             "/tmp",
             Some("tmpfs"),
@@ -32,8 +31,7 @@ pub struct MountProcFs;
 
 impl MountNamespacedFs for MountProcFs {
     fn loaded(&self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Mounting Proc FS (proc)");
-        mount::mount::<str, str, str, str>(
+        mount::mount::<_, _, _, str>(
             Some("proc"),
             "/proc",
             Some("proc"),
@@ -59,8 +57,7 @@ impl std::convert::From<String> for MountBindFs {
 
 impl MountNamespacedFs for MountBindFs {
     fn loading(&self, base_path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Mounting Main FS from {} to {:?}", self.source, base_path);
-        mount::mount::<str, std::path::Path, str, str>(
+        mount::mount::<str, _, str, str>(
             Some(&self.source),
             base_path,
             None,
