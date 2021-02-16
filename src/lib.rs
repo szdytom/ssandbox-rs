@@ -7,3 +7,6 @@ extern crate nix;
 
 pub mod container;
 pub mod filesystem;
+
+type CommonResult<T> = Result<T, Box<dyn std::error::Error>>;
+type VoidResult = CommonResult<()>;
