@@ -74,7 +74,7 @@ fn mount_filesystem(config: Arc<Config>) -> VoidResult {
 }
 
 fn run_init(config: Arc<Config>) -> NeverResult {
-    let cstyle_target = CString::new(config.target_executable.to_string()).unwrap();
+    let cstyle_target = CString::new(config.target_executable.to_string())?;
     unistd::execve::<_, CString>(&cstyle_target, &[cstyle_target.as_c_str()], &[])?;
 
     unreachable!()
