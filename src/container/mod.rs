@@ -1,16 +1,25 @@
-use {crate::filesystem::MountNamespacedFs, nix::unistd::Pid, std::sync::Arc};
+use {
+    crate::{filesystem::MountNamespacedFs, idmap, VoidResult},
+    nix::{
+        sys::signal,
+        unistd::{self, Pid},
+    },
+    std::sync::Arc,
+};
 
 mod entry;
 mod error;
 
 #[derive(Debug)]
 pub struct Config {
-    pub uid: u64,
+    pub uid: u64, // unique ID
     pub working_path: String,
     pub stack_size: usize,
     pub hostname: String,
     pub target_executable: String,
     pub fs: Vec<Box<dyn MountNamespacedFs>>,
+    pub inner_uid: u32, // uid inside container
+    pub inner_gid: u32, // gid inside container
 }
 
 impl Default for Config {
@@ -18,10 +27,12 @@ impl Default for Config {
         Self {
             uid: rand::random(),
             working_path: "/root/sandbox/work".to_string(),
-            stack_size: 256 * 1024, // 256kb
+            stack_size: 2 * 1024 * 1024, // 2048kb(2Mb)
             hostname: "container".to_string(),
             target_executable: "/bin/sh".into(),
             fs: Vec::new(),
+            inner_gid: 0,
+            inner_uid: 0,
         }
     }
 }
@@ -63,25 +74,60 @@ impl Container {
 
         self.stack_memory.resize(self.config.stack_size, 0);
 
+        let (ready_pipe_read, ready_pipe_write) = nix::unistd::pipe()?;
+        let (report_pipe_read, report_pipe_write) = nix::unistd::pipe()?;
+
         let ic = entry::InternalData {
             config: self.config.clone(),
+            ready_pipe_set: (ready_pipe_read, ready_pipe_write),
+            report_pipe_set: (report_pipe_read, report_pipe_write),
         };
-
         use nix::sched::CloneFlags;
-        self.container_pid = Some(
-            match nix::sched::clone(
-                box || entry::main(ic.clone()),
-                self.stack_memory.as_mut(),
-                CloneFlags::CLONE_NEWUTS
-                    | CloneFlags::CLONE_NEWIPC
-                    | CloneFlags::CLONE_NEWPID
-                    | CloneFlags::CLONE_NEWNS,
-                Some(nix::sys::signal::SIGCHLD as i32),
-            ) {
-                Ok(x) => x,
-                Err(e) => return Err(box error::Error::ForkFailed(e)),
-            },
-        );
+        let pid = match nix::sched::clone(
+            box || entry::main(ic.clone()),
+            self.stack_memory.as_mut(),
+            CloneFlags::CLONE_NEWUTS
+                | CloneFlags::CLONE_NEWIPC
+                | CloneFlags::CLONE_NEWPID
+                | CloneFlags::CLONE_NEWNS
+                | CloneFlags::CLONE_NEWUSER,
+            Some(signal::SIGCHLD as i32),
+        ) {
+            Ok(x) => x,
+            Err(e) => return Err(box error::Error::ForkFailed(e)),
+        };
+        self.container_pid = Some(pid);
+
+        unistd::close(ready_pipe_read)?;
+        unistd::close(report_pipe_write)?;
+        match (|| -> VoidResult {
+            idmap::map_to_root(pid)?;
+            Ok(())
+        })() {
+            Err(x) => {
+                signal::kill(pid, signal::SIGKILL)?;
+                return Err(x);
+            }
+            _ => {}
+        }
+
+        // ready, let's tell child:
+        // The closing of ready_pipe ends the block of read() at childs entry.
+        // So that the real command can be executed via execvp().
+        unistd::close(ready_pipe_write)?;
+
+        // our child maybe now complaining about errors
+        let mut child_status_buf: [u8; 1] = [255];
+        unistd::read(report_pipe_read, &mut child_status_buf)?;
+        if child_status_buf[0] != 0 {
+            let code = child_status_buf[0];
+            let mut addtional_info_buf = Vec::new();
+            unistd::read(ready_pipe_read, &mut addtional_info_buf)?;
+
+            let wrapped_error: error::Error =
+                error::EntryError::new(code, &addtional_info_buf).into();
+            return Err(box wrapped_error);
+        }
 
         Ok(())
     }

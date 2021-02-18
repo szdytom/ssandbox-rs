@@ -10,5 +10,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut c = Container::from(config);
     c.start()?;
     c.wait()?;
+    println!("Finished!");
     Ok(())
 }

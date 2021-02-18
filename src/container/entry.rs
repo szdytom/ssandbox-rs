@@ -1,8 +1,11 @@
 use {
     super::Config,
     crate::{CommonResult, VoidResult},
-    nix::mount::{self, MsFlags},
-    std::{ffi::CString, fs, sync::Arc},
+    nix::{
+        mount::{self, MsFlags},
+        unistd,
+    },
+    std::{ffi::CString, fs, os::unix::io::RawFd, sync::Arc},
 };
 
 type NeverResult = CommonResult<!>;
@@ -10,10 +13,12 @@ type NeverResult = CommonResult<!>;
 #[derive(Debug, Clone)]
 pub struct InternalData {
     pub config: Arc<Config>,
+    pub ready_pipe_set: (RawFd, RawFd),
+    pub report_pipe_set: (RawFd, RawFd),
 }
 
 fn set_hostname(hostname: &String) -> VoidResult {
-    nix::unistd::sethostname(hostname)?;
+    unistd::sethostname(hostname)?;
     Ok(())
 }
 
@@ -33,8 +38,8 @@ fn mark_mount_ns_private() -> VoidResult {
 }
 
 fn change_rootpath(root: &std::path::Path) -> VoidResult {
-    nix::unistd::chdir(root)?;
-    nix::unistd::chroot(".")?;
+    unistd::chdir(root)?;
+    unistd::chroot(".")?;
     Ok(())
 }
 
@@ -70,22 +75,42 @@ fn mount_filesystem(config: Arc<Config>) -> VoidResult {
 
 fn run_init(config: Arc<Config>) -> NeverResult {
     let cstyle_target = CString::new(config.target_executable.to_string()).unwrap();
-    nix::unistd::execv(&cstyle_target, &[cstyle_target.as_c_str()])?;
+    unistd::execve::<_, CString>(&cstyle_target, &[cstyle_target.as_c_str()], &[])?;
 
     unreachable!()
 }
 
-fn exceptable_main(cfg: InternalData) -> NeverResult {
-    let config = cfg.config;
+fn block_until_ready(p: RawFd) -> VoidResult {
+    unistd::read(p, &mut Vec::new())?;
+    Ok(())
+}
+
+fn exceptable_main(config: Arc<Config>, ready_pipe: RawFd, report_pipe: RawFd) -> NeverResult {
     set_hostname(&config.hostname)?;
     mount_filesystem(config.clone())?;
+    block_until_ready(ready_pipe)?;
+    unistd::write(report_pipe, &[0])?;
     run_init(config)
 }
 
-pub fn main(cfg: InternalData) -> ! {
-    match exceptable_main(cfg) {
-        Err(x) => println!("{:?}\n", x),
+fn extract_pipes(rd_set: (RawFd, RawFd), rp_set: (RawFd, RawFd)) -> CommonResult<(RawFd, RawFd)> {
+    let (rd_read, rd_write) = rd_set;
+    let (rp_read, rp_write) = rp_set;
+    unistd::close(rd_write)?;
+    unistd::close(rp_read)?;
+    Ok((rd_read, rp_write))
+}
+
+#[allow(unused_must_use)]
+pub fn main(cfg: InternalData) -> isize {
+    let (ready_pipe, report_pipe) = extract_pipes(cfg.ready_pipe_set, cfg.report_pipe_set).unwrap();
+    match exceptable_main(cfg.config, ready_pipe, report_pipe) {
+        Err(x) => {
+            println!("Entry Error:\n{}\nEnd.\n", x);
+            unistd::write(report_pipe, &[1]);
+            unistd::write(report_pipe, format!("{}", x).as_bytes());
+            return -1;
+        }
         _ => unreachable!(),
     };
-    unreachable!()
 }
