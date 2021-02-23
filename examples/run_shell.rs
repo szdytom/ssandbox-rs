@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config: Config = Default::default();
     config.fs.push(box filesystem::MountTmpFs);
     config.fs.push(box filesystem::MountProcFs);
-    config.fs.push(box filesystem::MountBindFs::from("/root/sandbox/image".to_string()));
+    config.fs.push(box filesystem::MountReadOnlyBindFs::from("/root/sandbox/image".to_string()));
     let mut c = Container::from(config);
     c.start()?;
     c.wait()?;

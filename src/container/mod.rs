@@ -82,6 +82,7 @@ impl Container {
             ready_pipe_set: (ready_pipe_read, ready_pipe_write),
             report_pipe_set: (report_pipe_read, report_pipe_write),
         };
+
         use nix::sched::CloneFlags;
         let pid = match nix::sched::clone(
             box || entry::main(ic.clone()),

@@ -22,7 +22,7 @@ fn set_hostname(hostname: &String) -> VoidResult {
     Ok(())
 }
 
-fn get_container_rootpath(base_path: &String, uid: u64) -> std::path::PathBuf {
+fn get_container_workpath(base_path: &String, uid: u64) -> std::path::PathBuf {
     [base_path, &uid.to_string()].iter().collect()
 }
 
@@ -52,14 +52,15 @@ fn create_rootdir(root: &std::path::Path) -> VoidResult {
 }
 
 fn mount_filesystem(config: Arc<Config>) -> VoidResult {
-    let container_rootpath = get_container_rootpath(&config.working_path, config.uid);
+    let container_workpath = get_container_workpath(&config.working_path, config.uid);
+    let container_rootpath = container_workpath.join("target");
 
     create_rootdir(&container_rootpath)?;
     mark_mount_ns_private()?;
 
     // mounts before chroot
     for x in config.fs.iter() {
-        x.loading(&container_rootpath)?;
+        x.loading(&container_rootpath, &container_workpath)?;
     }
 
     // chroot
@@ -106,7 +107,7 @@ pub fn main(cfg: InternalData) -> isize {
     let (ready_pipe, report_pipe) = extract_pipes(cfg.ready_pipe_set, cfg.report_pipe_set).unwrap();
     match exceptable_main(cfg.config, ready_pipe, report_pipe) {
         Err(x) => {
-            println!("Entry Error:\n{}\nEnd.\n", x);
+            println!("Entry Error:\n{:?}\nEnd.\n", x);
             unistd::write(report_pipe, &[1]);
             unistd::write(report_pipe, format!("{}", x).as_bytes());
             return -1;
