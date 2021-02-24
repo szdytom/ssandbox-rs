@@ -101,6 +101,7 @@ impl Container {
 
         unistd::close(ready_pipe_read)?;
         unistd::close(report_pipe_write)?;
+
         match (|| -> VoidResult {
             idmap::map_to_root(pid)?;
             Ok(())
