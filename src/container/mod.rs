@@ -33,13 +33,14 @@ impl Default for Config {
         Self {
             uid: rand::random(),
             working_path: "/root/sandbox/work".to_string(),
-            stack_size: 2 * 1024 * 1024, // 2048kb(2Mb)
+            stack_size: 8 * 1024 * 1024, // 8mb
             hostname: "container".to_string(),
             target_executable: "/bin/sh".into(),
             fs: Vec::new(),
-            security_policy: vec![box security::CapabilityPolicy {
-                ..Default::default()
-            }],
+            security_policy: vec![
+                box (Default::default(): security::CapabilityPolicy),
+                box (Default::default(): security::SeccompPolicy),
+            ],
             inner_gid: 0,
             inner_uid: 0,
         }

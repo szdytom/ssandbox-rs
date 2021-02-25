@@ -1,6 +1,7 @@
 #![feature(box_syntax)]
 #![feature(box_patterns)]
 #![feature(never_type)]
+#![feature(type_ascription)]
 
 extern crate rand;
 extern crate nix;
