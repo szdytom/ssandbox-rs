@@ -47,7 +47,7 @@ fn create_rootdir(root: &std::path::Path) -> VoidResult {
     if root.exists() {
         fs::remove_dir_all(root)?;
     }
-    fs::DirBuilder::new().recursive(true).create(root)?;
+    fs::create_dir_all(root)?;
     Ok(())
 }
 

@@ -148,7 +148,7 @@ impl MountNamespacedFs for MountExtraFs {
             None => {
                 let path = work_path.join("extra");
                 if !path.exists() {
-                    std::fs::DirBuilder::new().recursive(true).create(&path)?;
+                    std::fs::create_dir_all(&path)?;
                 }
                 path
             }

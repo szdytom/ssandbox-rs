@@ -33,7 +33,7 @@ impl Default for Config {
         Self {
             uid: rand::random(),
             working_path: "/tmp/ssandbox-rs.workspace/".to_string(),
-            stack_size: 8 * 1024 * 1024, // 8mb
+            stack_size: 2 * 1024 * 1024, // 2048kb
             hostname: "container".to_string(),
             target_executable: "/bin/sh".into(),
             fs: Vec::new(),
