@@ -23,7 +23,7 @@ pub struct Config {
     pub hostname: String,
     pub target_executable: String,
     pub fs: Vec<Box<dyn MountNamespacedFs>>,
-    pub security_policy: Vec<Box<dyn ApplySecurityPolicy>>,
+    pub security_policies: Vec<Box<dyn ApplySecurityPolicy>>,
     pub inner_uid: u32, // uid inside container
     pub inner_gid: u32, // gid inside container
 }
@@ -37,7 +37,7 @@ impl Default for Config {
             hostname: "container".to_string(),
             target_executable: "/bin/sh".into(),
             fs: Vec::new(),
-            security_policy: vec![
+            security_policies: vec![
                 box (Default::default(): security::CapabilityPolicy),
                 box (Default::default(): security::SeccompPolicy),
             ],

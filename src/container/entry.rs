@@ -96,7 +96,7 @@ fn apply_security_policy(policies: &Vec<Box<dyn ApplySecurityPolicy>>) -> VoidRe
 fn exceptable_main(config: Arc<Config>, ready_pipe: RawFd, report_pipe: RawFd) -> NeverResult {
     set_hostname(&config.hostname)?;
     mount_filesystem(config.clone())?;
-    apply_security_policy(&config.security_policy)?;
+    apply_security_policy(&config.security_policies)?;
 
     block_until_ready(ready_pipe)?;
     unistd::write(report_pipe, &[0])?;
