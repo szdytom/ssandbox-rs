@@ -1,5 +1,10 @@
 use {
-    crate::{filesystem::MountNamespacedFs, idmap, VoidResult},
+    crate::{
+        filesystem::MountNamespacedFs,
+        idmap,
+        security::{self, ApplySecurityPolicy},
+        VoidResult,
+    },
     nix::{
         sys::signal,
         unistd::{self, Pid},
@@ -18,6 +23,7 @@ pub struct Config {
     pub hostname: String,
     pub target_executable: String,
     pub fs: Vec<Box<dyn MountNamespacedFs>>,
+    pub security_policy: Vec<Box<dyn ApplySecurityPolicy>>,
     pub inner_uid: u32, // uid inside container
     pub inner_gid: u32, // gid inside container
 }
@@ -31,6 +37,9 @@ impl Default for Config {
             hostname: "container".to_string(),
             target_executable: "/bin/sh".into(),
             fs: Vec::new(),
+            security_policy: vec![box security::CapabilityPolicy {
+                ..Default::default()
+            }],
             inner_gid: 0,
             inner_uid: 0,
         }
