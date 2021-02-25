@@ -32,7 +32,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             uid: rand::random(),
-            working_path: "/root/sandbox/work".to_string(),
+            working_path: "/tmp/ssandbox-rs.workspace/".to_string(),
             stack_size: 8 * 1024 * 1024, // 8mb
             hostname: "container".to_string(),
             target_executable: "/bin/sh".into(),
