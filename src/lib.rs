@@ -9,6 +9,7 @@ extern crate nix;
 pub mod container;
 pub mod filesystem;
 pub mod security;
+pub mod resource;
 mod idmap;
 
 type CommonResult<T> = Result<T, Box<dyn std::error::Error>>;

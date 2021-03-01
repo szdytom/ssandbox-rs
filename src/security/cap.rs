@@ -19,7 +19,7 @@ impl CapabilityPolicy {
     }
 }
 
-impl std::default::Default for CapabilityPolicy {
+impl Default for CapabilityPolicy {
     fn default() -> Self {
         use caps::Capability;
 

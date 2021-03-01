@@ -57,7 +57,7 @@ impl SeccompPolicy {
     }
 }
 
-impl std::default::Default for SeccompPolicy {
+impl Default for SeccompPolicy {
     fn default() -> Self {
         Self {
             deny: vec![

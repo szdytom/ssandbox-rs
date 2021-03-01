@@ -2,6 +2,7 @@ use {
     crate::{
         filesystem::MountNamespacedFs,
         idmap,
+        resource::CGroupLimitPolicy,
         security::{self, ApplySecurityPolicy},
         VoidResult,
     },
@@ -24,6 +25,7 @@ pub struct Config {
     pub target_executable: String,
     pub fs: Vec<Box<dyn MountNamespacedFs>>,
     pub security_policies: Vec<Box<dyn ApplySecurityPolicy>>,
+    pub cgroup_limits: Box<CGroupLimitPolicy>,
     pub inner_uid: u32, // uid inside container
     pub inner_gid: u32, // gid inside container
 }
@@ -41,6 +43,7 @@ impl Default for Config {
                 box (Default::default(): security::CapabilityPolicy),
                 box (Default::default(): security::SeccompPolicy),
             ],
+            cgroup_limits: Default::default(),
             inner_gid: 0,
             inner_uid: 0,
         }
@@ -77,7 +80,7 @@ impl Container {
         self.container_pid != None
     }
 
-    pub fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn start(&mut self) -> VoidResult {
         if self.has_started() {
             return Err(box error::Error::AlreadyStarted);
         }
@@ -114,6 +117,7 @@ impl Container {
 
         match (|| -> VoidResult {
             idmap::map_to_root(pid)?;
+            self.config.cgroup_limits.apply(self.config.uid, pid)?;
             Ok(())
         })() {
             Err(x) => {
@@ -144,10 +148,45 @@ impl Container {
         Ok(())
     }
 
-    pub fn wait(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn wait(&mut self) -> VoidResult {
         if self.has_started() {
             nix::sys::wait::waitpid(self.container_pid, None)?;
+            self.container_pid = None;
         }
         Ok(())
+    }
+
+    pub fn terminate(&mut self) -> VoidResult {
+        if let Some(pid) = self.container_pid {
+            signal::kill(pid, signal::SIGKILL)?;
+        }
+        self.wait()
+    }
+
+    pub fn delete(&mut self) -> VoidResult {
+        let uid = self.config.uid;
+        self.terminate()?;
+        self.config.cgroup_limits.delete(uid)?;
+        std::fs::remove_dir_all(
+            std::path::PathBuf::from(&self.config.working_path).join(format!("{}", uid)),
+        )?;
+        Ok(())
+    }
+
+    pub fn freeze(&self) -> VoidResult {
+        self.config.cgroup_limits.freeze(self.config.uid)
+    }
+
+    pub fn thaw(&self) -> VoidResult {
+        self.config.cgroup_limits.thaw(self.config.uid)
+    }
+}
+
+impl Drop for Container {
+    #[allow(unused_must_use)]
+    fn drop(&mut self) {
+        if self.has_started() {
+            self.delete().unwrap();
+        }
     }
 }
