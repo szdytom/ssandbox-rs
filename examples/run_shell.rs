@@ -11,7 +11,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.fs.push(box filesystem::MountProcFs);
     config.fs.push(box filesystem::MountReadOnlyBindFs::from("/root/sandbox/image".to_string()));
     config.fs.push(box filesystem::MountExtraFs::new());
-    config.cgroup_limits.set_fork_limit(3);
+    config.cgroup_limits.set_fork_limit(10);
+    config.cgroup_limits.set_memory_limit(512 * 1024 * 1024); // 512Mb
     let mut c = Container::from(config);
     c.start()?;
     c.wait()?;
