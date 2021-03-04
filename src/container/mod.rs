@@ -20,7 +20,6 @@ mod error;
 pub struct Config {
     pub uid: u64, // unique ID
     pub working_path: String,
-    pub stack_size: usize,
     pub hostname: String,
     pub target_executable: String,
     pub fs: Vec<Box<dyn MountNamespacedFs>>,
@@ -35,7 +34,6 @@ impl Default for Config {
         Self {
             uid: rand::random(),
             working_path: "/tmp/ssandbox-rs.workspace/".to_string(),
-            stack_size: 2 * 1024 * 1024, // 2048kb
             hostname: "container".to_string(),
             target_executable: "/bin/sh".into(),
             fs: Vec::new(),
@@ -85,12 +83,14 @@ impl Container {
     }
 
     pub fn start(&mut self) -> VoidResult {
-        if self.has_started() {
+        const STACK_SIZE: usize = 2 * 1024 * 1024;
+
+        if self.has_started() || self.has_ened() {
             return Err(box error::Error::AlreadyStarted);
         }
 
         let mut stack_memory = Vec::new();
-        stack_memory.resize(self.config.stack_size, 0);
+        stack_memory.resize(STACK_SIZE, 0);
 
         let (ready_pipe_read, ready_pipe_write) = nix::unistd::pipe()?;
         let (report_pipe_read, report_pipe_write) = nix::unistd::pipe()?;
