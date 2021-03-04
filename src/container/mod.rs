@@ -52,7 +52,6 @@ impl Default for Config {
 
 #[derive(Debug, Clone)]
 pub struct Container {
-    stack_memory: Vec<u8>,
     config: Arc<Config>,
     container_pid: Option<Pid>,
     already_ended: bool,
@@ -61,7 +60,6 @@ pub struct Container {
 impl std::convert::From<Config> for Container {
     fn from(source: Config) -> Self {
         Self {
-            stack_memory: Vec::new(),
             config: Arc::new(source),
             container_pid: None,
             already_ended: false,
@@ -72,7 +70,6 @@ impl std::convert::From<Config> for Container {
 impl Container {
     pub fn new() -> Self {
         Self {
-            stack_memory: Vec::new(),
             config: Arc::new(Default::default()),
             container_pid: None,
             already_ended: false,
@@ -92,7 +89,8 @@ impl Container {
             return Err(box error::Error::AlreadyStarted);
         }
 
-        self.stack_memory.resize(self.config.stack_size, 0);
+        let mut stack_memory = Vec::new();
+        stack_memory.resize(self.config.stack_size, 0);
 
         let (ready_pipe_read, ready_pipe_write) = nix::unistd::pipe()?;
         let (report_pipe_read, report_pipe_write) = nix::unistd::pipe()?;
@@ -106,7 +104,7 @@ impl Container {
         use nix::sched::CloneFlags;
         let pid = match nix::sched::clone(
             box || entry::main(ic.clone()),
-            self.stack_memory.as_mut(),
+            stack_memory.as_mut(),
             CloneFlags::CLONE_NEWUTS
                 | CloneFlags::CLONE_NEWIPC
                 | CloneFlags::CLONE_NEWPID
