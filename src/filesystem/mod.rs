@@ -164,3 +164,55 @@ impl MountNamespacedFs for MountExtraFs {
         Ok(())
     }
 }
+
+#[derive(Debug)]
+pub struct MountSizedTmpFs {
+    size_limit: Option<u64>,
+    target: String,
+}
+
+impl Default for MountSizedTmpFs {
+    fn default() -> Self {
+        Self {
+            size_limit: None,
+            target: "/tmp".to_string(),
+        }
+    }
+}
+
+impl From<u64> for MountSizedTmpFs {
+    fn from(x: u64) -> Self {
+        Self {
+            size_limit: Some(x),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<String> for MountSizedTmpFs {
+    fn from(x: String) -> Self {
+        Self {
+            target: x,
+            ..Default::default()
+        }
+    }
+}
+
+impl MountNamespacedFs for MountSizedTmpFs {
+    fn loaded(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let data = if let Some(size) = self.size_limit {
+            format!("size={}", size)
+        } else {
+            "".to_string()
+        };
+
+        mount::mount::<_, str, _, str>(
+            Some("tmpfs"),
+            &self.target,
+            Some("tmpfs"),
+            MsFlags::empty(),
+            if data.is_empty() { None } else { Some(&data) },
+        )?;
+        Ok(())
+    }
+}
