@@ -55,6 +55,7 @@ pub struct Container {
     stack_memory: Vec<u8>,
     config: Arc<Config>,
     container_pid: Option<Pid>,
+    already_ended: bool,
 }
 
 impl std::convert::From<Config> for Container {
@@ -63,6 +64,7 @@ impl std::convert::From<Config> for Container {
             stack_memory: Vec::new(),
             config: Arc::new(source),
             container_pid: None,
+            already_ended: false,
         }
     }
 }
@@ -73,11 +75,16 @@ impl Container {
             stack_memory: Vec::new(),
             config: Arc::new(Default::default()),
             container_pid: None,
+            already_ended: false,
         }
     }
 
     pub fn has_started(&self) -> bool {
         self.container_pid != None
+    }
+
+    pub fn has_ened(&self) -> bool {
+        self.already_ended
     }
 
     pub fn start(&mut self) -> VoidResult {
@@ -149,18 +156,23 @@ impl Container {
     }
 
     pub fn wait(&mut self) -> VoidResult {
-        if self.has_started() {
-            nix::sys::wait::waitpid(self.container_pid, None)?;
-            self.container_pid = None;
+        if !self.has_ened() {
+            if let Some(pid) = self.container_pid {
+                nix::sys::wait::waitpid(pid, None)?;
+            }
+            self.already_ended = true;
         }
         Ok(())
     }
 
     pub fn terminate(&mut self) -> VoidResult {
-        if let Some(pid) = self.container_pid {
-            signal::kill(pid, signal::SIGKILL)?;
+        if !self.has_ened() {
+            if let Some(pid) = self.container_pid {
+                signal::kill(pid, signal::SIGKILL)?;
+            }
+            self.wait()?;
         }
-        self.wait()
+        Ok(())
     }
 
     pub fn delete(&mut self) -> VoidResult {
@@ -186,7 +198,7 @@ impl Drop for Container {
     #[allow(unused_must_use)]
     fn drop(&mut self) {
         if self.has_started() {
-            self.delete().unwrap();
+            self.delete();
         }
     }
 }
