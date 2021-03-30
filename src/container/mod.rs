@@ -27,6 +27,7 @@ pub struct Config {
     pub cgroup_limits: Box<CGroupLimitPolicy>,
     pub inner_uid: u32, // uid inside container
     pub inner_gid: u32, // gid inside container
+    pub time_limit: std::time::Duration,
 }
 
 impl Default for Config {
@@ -44,6 +45,7 @@ impl Default for Config {
             cgroup_limits: Default::default(),
             inner_gid: 0,
             inner_uid: 0,
+            time_limit: std::time::Duration::from_secs(1),
         }
     }
 }
@@ -149,6 +151,19 @@ impl Container {
                 error::EntryError::new(code, &addtional_info_buf).into();
             return Err(box wrapped_error);
         }
+
+        let time_limit = self.config.time_limit.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(time_limit);
+
+            use nix::sys::wait;
+            match wait::waitpid(pid, Some(wait::WaitPidFlag::WNOHANG)) {
+                Ok(wait::WaitStatus::StillAlive) => {
+                    let _ = signal::kill(pid, signal::SIGKILL);
+                }
+                _ => {}
+            };
+        });
 
         Ok(())
     }
