@@ -28,6 +28,9 @@ pub struct Config {
     pub inner_uid: u32, // uid inside container
     pub inner_gid: u32, // gid inside container
     pub time_limit: std::time::Duration,
+    pub stdin: Option<String>,
+    pub stdout: Option<String>,
+    pub stderr: Option<String>,
 }
 
 impl Default for Config {
@@ -46,6 +49,9 @@ impl Default for Config {
             inner_gid: 0,
             inner_uid: 0,
             time_limit: std::time::Duration::from_secs(1),
+            stdin: None,
+            stdout: None,
+            stderr: None,
         }
     }
 }
@@ -61,6 +67,16 @@ impl std::convert::From<Config> for Container {
     fn from(source: Config) -> Self {
         Self {
             config: Arc::new(source),
+            container_pid: None,
+            already_ended: false,
+        }
+    }
+}
+
+impl std::convert::From<Arc<Config>> for Container {
+    fn from(source: Arc<Config>) -> Self {
+        Self {
+            config: source,
             container_pid: None,
             already_ended: false,
         }
@@ -85,7 +101,7 @@ impl Container {
     }
 
     pub fn start(&mut self) -> VoidResult {
-        const STACK_SIZE: usize = 2 * 1024 * 1024;
+        const STACK_SIZE: usize = 2 * 1024 * 1024; // 2048kb
 
         if self.has_started() || self.has_ened() {
             return Err(box error::Error::AlreadyStarted);

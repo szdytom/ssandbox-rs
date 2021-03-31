@@ -1,6 +1,6 @@
 use {
     super::Config,
-    crate::{CommonResult, VoidResult, security::ApplySecurityPolicy},
+    crate::{security::ApplySecurityPolicy, CommonResult, VoidResult},
     nix::{
         mount::{self, MsFlags},
         unistd,
@@ -93,8 +93,55 @@ fn apply_security_policy(policies: &Vec<Box<dyn ApplySecurityPolicy>>) -> VoidRe
     Ok(())
 }
 
+fn redirect_standard_io(config: Arc<Config>) -> VoidResult {
+    const STDIN_FN: RawFd = 0;
+    const STDOUT_FN: RawFd = 1;
+    const STDERR_FN: RawFd = 2;
+
+    use nix::{fcntl::OFlag, sys::stat::Mode};
+    fn open_input(path: std::path::PathBuf) -> CommonResult<RawFd> {
+        Ok(nix::fcntl::open(
+            &path,
+            OFlag::O_RDONLY | OFlag::O_CLOEXEC,
+            Mode::empty(),
+        )?)
+    }
+
+    fn open_output(path: std::path::PathBuf) -> CommonResult<RawFd> {
+        Ok(nix::fcntl::open(
+            &path,
+            OFlag::O_WRONLY | OFlag::O_CREAT | OFlag::O_TRUNC | OFlag::O_CLOEXEC,
+            Mode::from_bits_truncate(0o644),
+        )?)
+    }
+
+    fn do_redirect(source: RawFd, target: RawFd) -> VoidResult {
+        unistd::dup2(source, target)?;
+        unistd::close(source)?;
+        Ok(())
+    }
+
+    if let Some(p) = &config.stdin {
+        let fd = open_input(std::path::PathBuf::from(p))?;
+        do_redirect(fd, STDIN_FN)?;
+    }
+
+    if let Some(p) = &config.stdout {
+        let fd = open_output(std::path::PathBuf::from(p))?;
+        do_redirect(fd, STDOUT_FN)?;
+    }
+
+    if let Some(p) = &config.stderr {
+        let fd = open_output(std::path::PathBuf::from(p))?;
+        do_redirect(fd, STDERR_FN)?;
+    }
+
+    Ok(())
+}
+
 fn exceptable_main(config: Arc<Config>, ready_pipe: RawFd, report_pipe: RawFd) -> NeverResult {
     set_hostname(&config.hostname)?;
+    redirect_standard_io(config.clone())?;
     mount_filesystem(config.clone())?;
     apply_security_policy(&config.security_policies)?;
 
