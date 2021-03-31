@@ -139,11 +139,17 @@ fn redirect_standard_io(config: Arc<Config>) -> VoidResult {
     Ok(())
 }
 
+fn check_init(config: Arc<Config>) -> VoidResult {
+    unistd::access::<str>(&config.target_executable, unistd::AccessFlags::X_OK)?;
+    Ok(())
+}
+
 fn exceptable_main(config: Arc<Config>, ready_pipe: RawFd, report_pipe: RawFd) -> NeverResult {
     set_hostname(&config.hostname)?;
     redirect_standard_io(config.clone())?;
     mount_filesystem(config.clone())?;
     apply_security_policy(&config.security_policies)?;
+    check_init(config.clone())?;
 
     block_until_ready(ready_pipe)?;
     unistd::write(report_pipe, &[0])?;
@@ -162,12 +168,15 @@ fn extract_pipes(rd_set: (RawFd, RawFd), rp_set: (RawFd, RawFd)) -> CommonResult
 pub fn main(cfg: InternalData) -> isize {
     let (ready_pipe, report_pipe) = extract_pipes(cfg.ready_pipe_set, cfg.report_pipe_set).unwrap();
     match exceptable_main(cfg.config, ready_pipe, report_pipe) {
-        Err(x) => {
-            println!("Entry Error:\n{:?}\nEnd.\n", x);
+        Err(err) => {
+            println!("Entry Error:\n{}\nEnd.\n", err);
             unistd::write(report_pipe, &[1]);
-            unistd::write(report_pipe, format!("{}", x).as_bytes());
-            return -1;
+            let report_msg = format!("{}", err).to_string();
+            let report_msg_buf = report_msg.as_bytes();
+            unistd::write(report_pipe, &report_msg_buf.len().to_ne_bytes());
+            unistd::write(report_pipe, report_msg_buf);
+            -1
         }
         _ => unreachable!(),
-    };
+    }
 }

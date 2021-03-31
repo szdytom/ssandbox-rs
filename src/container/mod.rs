@@ -156,12 +156,17 @@ impl Container {
         unistd::close(ready_pipe_write)?;
 
         // our child maybe now complaining about errors
-        let mut child_status_buf: [u8; 1] = [255];
+        let mut child_status_buf = [0_u8; 1];
         unistd::read(report_pipe_read, &mut child_status_buf)?;
         if child_status_buf[0] != 0 {
             let code = child_status_buf[0];
+            let mut addtional_info_length_buf = [0_u8; std::mem::size_of::<usize>()];
+            unistd::read(report_pipe_read, &mut addtional_info_length_buf)?;
+            let addtional_info_length = usize::from_ne_bytes(addtional_info_length_buf);
+
             let mut addtional_info_buf = Vec::new();
-            unistd::read(ready_pipe_read, &mut addtional_info_buf)?;
+            addtional_info_buf.resize(addtional_info_length, 0);
+            unistd::read(report_pipe_read, &mut addtional_info_buf)?;
 
             let wrapped_error: error::Error =
                 error::EntryError::new(code, &addtional_info_buf).into();
