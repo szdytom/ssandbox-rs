@@ -5,6 +5,9 @@
 
 extern crate rand;
 extern crate nix;
+extern crate libscmp;
+extern crate caps;
+extern crate cgroups_rs;
 
 pub mod container;
 pub mod filesystem;
