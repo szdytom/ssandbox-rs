@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["szdytom <szdytom@163.com>"]
 edition = "2018"
 license = "MIT"
+description = "This crate is used to create sandboxes on Linux."
+homepage = "https://github.com/segment-oj/ssandbox-rs"
+repository = "https://github.com/segment-oj/ssandbox-rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
